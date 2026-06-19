@@ -287,6 +287,13 @@ export default function ChalanasBet(){
   },[meId,showToast]);
 
   /* ----- admin: salvar matches / settings ----- */
+  const saveBetFor = useCallback(async (pid, matchId, h, a)=>{
+    const cur = await getJSON(K_BET(pid),true,{}) || {};
+    if(h===""||a===""||h==null||a==null){ delete cur[matchId]; }
+    else { cur[matchId] = { h:Math.max(0,Math.min(19,parseInt(h,10)||0)), a:Math.max(0,Math.min(19,parseInt(a,10)||0)) }; }
+    await setJSON(K_BET(pid), cur, true);
+    setBets(prev=>({ ...prev, [pid]: cur }));
+  },[]);
   const saveMatches = useCallback(async (ms)=>{ setMatches(ms); await setJSON(K_MATCHES, ms, true); },[]);
   const saveSettings = useCallback(async (st)=>{ setSettings(st); await setJSON(K_SETTINGS, st, true); },[]);
 
@@ -328,7 +335,8 @@ export default function ChalanasBet(){
             )}
             {tab==="regras" && <RegrasTab/>}
             {tab==="admin" && (
-              <AdminTab matches={matches} settings={settings} onSaveMatches={saveMatches}
+              <AdminTab matches={matches} settings={settings} players={players} bets={bets}
+                        onSaveMatches={saveMatches} onSaveBetFor={saveBetFor}
                         onSaveSettings={saveSettings} onReseed={()=>saveMatches(SEED_MATCHES)} showToast={showToast}/>
             )}
           </>
@@ -688,8 +696,73 @@ function RegrasTab(){
   );
 }
 
+/* ---------------------------- ADMIN: LANÇAR PALPITES ---------------------------- */
+function AdminBets({matches,players,bets,onSaveBetFor,showToast}){
+  const ordered = useMemo(()=> [...matches].sort((a,b)=> ROUND_ORDER(a.rodada)-ROUND_ORDER(b.rodada) || kickoffMs(a)-kickoffMs(b)), [matches]);
+  const [mid,setMid] = useState("");
+  const [vals,setVals] = useState({});
+  const [saving,setSaving] = useState(false);
+
+  useEffect(()=>{ if(!mid && ordered.length){ const n = ordered.find(m=>!m.finished) || ordered[0]; setMid(n.id); } },[ordered,mid]);
+
+  // ao trocar de jogo, carrega os palpites já existentes
+  useEffect(()=>{
+    if(!mid) return;
+    const v = {};
+    players.forEach(p=>{ const b=bets[p.id]?.[mid]; v[p.id] = { h: b? String(b.h):"", a: b? String(b.a):"" }; });
+    setVals(v);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[mid, players.length]);
+
+  const setV = (pid, side, value)=> setVals(s=> ({...s, [pid]: {...(s[pid]||{h:"",a:""}), [side]: value}}));
+  const m = ordered.find(x=>x.id===mid);
+
+  async function salvar(){
+    if(!mid) return;
+    setSaving(true);
+    let n=0;
+    for(const p of players){
+      const v = vals[p.id] || {h:"",a:""};
+      const cur = bets[p.id]?.[mid];
+      const curH = cur? String(cur.h):"", curA = cur? String(cur.a):"";
+      if(String(v.h)!==curH || String(v.a)!==curA){ await onSaveBetFor(p.id, mid, v.h, v.a); n++; }
+    }
+    setSaving(false);
+    showToast(n>0 ? `${n} palpite(s) salvo(s)` : "Nada mudou");
+  }
+
+  return (
+    <section className="cb-block">
+      <h3 className="cb-block-title"><Users size={15}/> Lançar palpites (organizador)</h3>
+      <p className="cb-admin-p">Escolha o jogo e digite o placar de cada jogador. Em branco = sem palpite. Útil para subir palpites feitos fora do app.</p>
+      <div className="cb-select-wrap cb-be-select">
+        <select className="cb-select" value={mid} onChange={e=>setMid(e.target.value)}>
+          {ordered.map(x=> <option key={x.id} value={x.id}>{x.home} × {x.away} — {dateLabel(x.date)} {x.time}{x.finished?" ✓":""}</option>)}
+        </select>
+        <ChevronDown size={16} className="cb-select-caret"/>
+      </div>
+      {m && <div className="cb-be-head">{flag(m.home)} {m.home} <b>×</b> {m.away} {flag(m.away)}</div>}
+      <div className="cb-betentry">
+        {players.map(p=>(
+          <div key={p.id} className="cb-be-row">
+            <span className="cb-be-name">{flag(p.favTeam)} {p.name}</span>
+            <div className="cb-be-inputs">
+              <input className="cb-pick" type="number" min="0" max="19" inputMode="numeric" value={vals[p.id]?.h ?? ""} onChange={e=>setV(p.id,"h",e.target.value)} aria-label={`gols ${m?m.home:""} ${p.name}`}/>
+              <span className="cb-x">×</span>
+              <input className="cb-pick" type="number" min="0" max="19" inputMode="numeric" value={vals[p.id]?.a ?? ""} onChange={e=>setV(p.id,"a",e.target.value)} aria-label={`gols ${m?m.away:""} ${p.name}`}/>
+            </div>
+          </div>
+        ))}
+      </div>
+      <button className="cb-btn cb-btn-primary cb-btn-block" disabled={saving} onClick={salvar}>
+        <Check size={15}/> {saving ? "Salvando…" : "Salvar palpites deste jogo"}
+      </button>
+    </section>
+  );
+}
+
 /* ---------------------------- ADMIN ---------------------------- */
-function AdminTab({matches,settings,onSaveMatches,onSaveSettings,onReseed,showToast}){
+function AdminTab({matches,settings,players,bets,onSaveMatches,onSaveBetFor,onSaveSettings,onReseed,showToast}){
   const [pin,setPin] = useState("");
   const [ok,setOk] = useState(false);
   const [draft,setDraft] = useState(matches);
@@ -757,6 +830,8 @@ function AdminTab({matches,settings,onSaveMatches,onSaveSettings,onReseed,showTo
         </div>
         {iaStatus && <div className="cb-iastatus">{iaStatus}</div>}
       </section>
+
+      <AdminBets matches={matches} players={players} bets={bets} onSaveBetFor={onSaveBetFor} showToast={showToast}/>
 
       <section className="cb-block">
         <div className="cb-block-titlebar">
@@ -1037,6 +1112,14 @@ function StyleTag(){
 .cb-ar-sc{width:46px;height:36px;font-size:16px;}
 .cb-del{flex:none;color:var(--neg);}
 .cb-input[type=date],.cb-input[type=time]{color-scheme:dark;}
+.cb-be-select{margin-bottom:12px;}
+.cb-be-head{display:flex;align-items:center;gap:7px;justify-content:center;font-family:'Oswald';font-weight:600;font-size:15px;background:#0a1c12;border:1px solid var(--line);border-radius:10px;padding:9px;margin-bottom:10px;}
+.cb-be-head b{color:var(--muted);}
+.cb-betentry{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.cb-be-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0a1c12;border:1px solid var(--line);border-radius:10px;padding:7px 11px;}
+.cb-be-name{font-weight:600;font-size:13px;}
+.cb-be-inputs{display:flex;align-items:center;gap:6px;flex:none;}
+.cb-be-inputs .cb-pick{width:40px;height:34px;font-size:16px;}
 
 /* misc */
 .cb-foot{text-align:center;font-size:11px;color:var(--muted);margin-top:24px;}
