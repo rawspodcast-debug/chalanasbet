@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Trophy, Lock, Shield, Users, RefreshCw, Settings, Plus, Check, ChevronDown, Calendar, Flame, X, LogOut } from "lucide-react";
+import { Trophy, Lock, Shield, Users, RefreshCw, Settings, Plus, Check, ChevronDown, Calendar, Flame, X, Sliders } from "lucide-react";
 import { sGet, sSet, sList } from "./supabase";
 
 /* =========================================================================
@@ -86,7 +86,58 @@ const SEED_MATCHES = [
   { id:"m3-arl-aut", rodada:"3ª rodada", date:"2026-06-27", time:"23:00", home:"Argélia", away:"Áustria", realH:null, realA:null, finished:false },
   { id:"m3-jor-arg", rodada:"3ª rodada", date:"2026-06-27", time:"23:00", home:"Jordânia", away:"Argentina", realH:null, realA:null, finished:false },
 ];
+
+// ===== MATA-MATA (confrontos definidos após a fase de grupos) =====
+// home/away ficam null até o organizador definir os times. slotH/slotA = rótulo do confronto.
+// Horários convertidos da grade oficial FIFA para Brasília (BRT = ET + 1h).
+// Datas oficiais; horários de Quartas (09 e 10/07) são estimativas — confirmar no Admin.
+const ko = (id, rodada, date, time, slotH, slotA)=>(
+  { id, rodada, date, time, home:null, away:null, slotH, slotA, realH:null, realA:null, finished:false }
+);
+const KNOCKOUT_MATCHES = [
+  // ----- 16-AVOS (Round of 32) — 28/06 a 03/07 -----
+  ko("k-73","16-avos","2026-06-28","16:00","2º Grupo A","2º Grupo B"),
+  ko("k-76","16-avos","2026-06-29","14:00","1º Grupo C","2º Grupo F"),
+  ko("k-74","16-avos","2026-06-29","17:30","1º Grupo E","3º A/B/C/D/F"),
+  ko("k-75","16-avos","2026-06-29","22:00","1º Grupo F","2º Grupo C"),
+  ko("k-78","16-avos","2026-06-30","14:00","2º Grupo E","2º Grupo I"),
+  ko("k-77","16-avos","2026-06-30","18:00","1º Grupo I","3º C/D/F/G/H"),
+  ko("k-79","16-avos","2026-06-30","22:00","1º Grupo A","3º C/E/F/H/I"),
+  ko("k-80","16-avos","2026-07-01","13:00","1º Grupo L","3º E/H/I/J/K"),
+  ko("k-82","16-avos","2026-07-01","17:00","1º Grupo G","3º A/E/H/I/J"),
+  ko("k-81","16-avos","2026-07-01","21:00","1º Grupo D","3º B/E/F/I/J"),
+  ko("k-84","16-avos","2026-07-02","16:00","1º Grupo H","2º Grupo J"),
+  ko("k-83","16-avos","2026-07-02","20:00","2º Grupo K","2º Grupo L"),
+  ko("k-85","16-avos","2026-07-03","00:00","1º Grupo B","3º E/F/G/I/J"),
+  ko("k-88","16-avos","2026-07-03","15:00","2º Grupo D","2º Grupo G"),
+  ko("k-86","16-avos","2026-07-03","19:00","1º Grupo J","2º Grupo H"),
+  ko("k-87","16-avos","2026-07-03","22:30","1º Grupo K","3º D/E/I/J/L"),
+  // ----- OITAVAS (Round of 16) — 04 a 07/07 -----
+  ko("k-90","Oitavas","2026-07-04","14:00","Venc. 73","Venc. 75"),
+  ko("k-89","Oitavas","2026-07-04","18:00","Venc. 74","Venc. 77"),
+  ko("k-91","Oitavas","2026-07-05","17:00","Venc. 76","Venc. 78"),
+  ko("k-92","Oitavas","2026-07-05","21:00","Venc. 79","Venc. 80"),
+  ko("k-93","Oitavas","2026-07-06","16:00","Venc. 83","Venc. 84"),
+  ko("k-94","Oitavas","2026-07-06","21:00","Venc. 81","Venc. 82"),
+  ko("k-95","Oitavas","2026-07-07","13:00","Venc. 86","Venc. 88"),
+  ko("k-96","Oitavas","2026-07-07","17:00","Venc. 85","Venc. 87"),
+  // ----- QUARTAS — 09 a 11/07 (horários de 09 e 10/07 a confirmar) -----
+  ko("k-97","Quartas","2026-07-09","16:00","Venc. 89","Venc. 90"),
+  ko("k-98","Quartas","2026-07-10","17:00","Venc. 93","Venc. 94"),
+  ko("k-99","Quartas","2026-07-11","18:00","Venc. 91","Venc. 92"),
+  ko("k-100","Quartas","2026-07-11","22:00","Venc. 95","Venc. 96"),
+  // ----- SEMIFINAL — 14 e 15/07 -----
+  ko("k-101","Semifinal","2026-07-14","16:00","Venc. 97","Venc. 98"),
+  ko("k-102","Semifinal","2026-07-15","16:00","Venc. 99","Venc. 100"),
+  // ----- 3º LUGAR — 18/07 -----
+  ko("k-103","3º lugar","2026-07-18","18:00","Perdedor SF 1","Perdedor SF 2"),
+  // ----- FINAL — 19/07 -----
+  ko("k-104","Final","2026-07-19","16:00","Vencedor SF 1","Vencedor SF 2"),
+];
+
 const ADMIN_PIN = "chalana26";
+// Usuários com acesso ao painel Admin (item 6). Comparação por nome normalizado.
+const ADMIN_USERS = ["tiarles","diego paz"];
 
 // Apostadores pré-cadastrados (tabela enviada). O badge "VOCÊ" aparece para quem estiver logado.
 // base = pontuação acumulada até Suíça × Bósnia (saldo inicial). seedRank = ordem de desempate da tabela.
@@ -134,6 +185,7 @@ const K_PLAYERS = "chalanas:players:v1";
 const K_BET = (pid)=>`chalanas:bet:${pid}`;
 const K_SETTINGS = "chalanas:settings:v1";
 const K_SEEDVER = "chalanas:seedver";
+const K_KOVER = "chalanas:koseed";   // migração: acrescenta os jogos do mata-mata
 const K_ME = "chalanas:me:v1"; // pessoal (por dispositivo)
 
 /* ---------- utilidades ---------- */
@@ -144,7 +196,15 @@ const kickoffMs = (m)=> new Date(iso(m.date,m.time)).getTime();
 const fmtPts = (n)=>{ const v=Math.round(n*10)/10; return (v%1===0? String(v): v.toFixed(1)).replace(".",","); };
 const WD = ["dom","seg","ter","qua","qui","sex","sáb"];
 function dateLabel(d){ const dt=new Date(d+"T12:00:00-03:00"); return `${WD[dt.getDay()]} · ${String(dt.getDate()).padStart(2,"0")}/${String(dt.getMonth()+1).padStart(2,"0")}`; }
-const ROUND_ORDER = (r)=>{ const map={"1ª rodada":1,"2ª rodada":2,"3ª rodada":3}; return map[r] ?? 99; };
+const ROUND_ORDER = (r)=>{ const map={"1ª rodada":1,"2ª rodada":2,"3ª rodada":3,"16-avos":4,"Oitavas":5,"Quartas":6,"Semifinal":7,"3º lugar":8,"Final":9}; return map[r] ?? 99; };
+// rótulo curto da aba por rodada
+const ROUND_LABEL = (r)=>({ "1ª rodada":"Grupos · Rod. 1","2ª rodada":"Grupos · Rod. 2","3ª rodada":"Grupos · Rod. 3" }[r] || r);
+const isGroupRound = (r)=> r==="1ª rodada"||r==="2ª rodada"||r==="3ª rodada";
+// times definidos? (no mata-mata, home/away ficam null até o organizador definir)
+const teamsSet = (m)=> !!m.home && !!m.away;
+const sideName = (m,side)=> side==="h" ? (m.home || m.slotH || "A definir") : (m.away || m.slotA || "A definir");
+const sideFlag = (m,side)=>{ const t = side==="h"? m.home : m.away; return t ? flag(t) : "⬢"; };
+const matchLabel = (m)=> `${sideName(m,"h")} × ${sideName(m,"a")}`;
 
 /* ---------- motor de pontuação ----------
    5  placar exato (empate exato também = 5)
@@ -194,7 +254,7 @@ export default function ChalanasBet(){
   const [bets,setBets] = useState({});           // { pid: { matchId:{h,a} } }
   const [settings,setSettings] = useState({ revealBeforeLock:false });
   const [meId,setMeId] = useState(null);
-  const [tab,setTab] = useState("jogos");
+  const [tab,setTab] = useState("ranking");
   const [now,setNow] = useState(Date.now());
   const [toast,setToast] = useState(null);
   const toastT = useRef(null);
@@ -210,13 +270,22 @@ export default function ChalanasBet(){
     setMatches(ms); setPlayers(ps); setSettings(st); setBets(bmap);
   },[]);
 
-  // roda uma vez: garante tabela, trava de 2h em 18/06 e cadastro dos apostadores
+  // roda uma vez: garante tabela, acrescenta o mata-mata e cadastra os apostadores
   const ensureSeed = useCallback(async ()=>{
     let ms = await getJSON(K_MATCHES,true,null);
-    let changed = !ms;
-    if(!ms) ms = SEED_MATCHES.slice();
-    ms = ms.map(m=>{ if(m.date==="2026-06-18" && m.lockMin==null){ changed=true; return {...m, lockMin:120}; } return m; });
-    if(changed) await setJSON(K_MATCHES, ms, true);
+    if(!ms){ ms = SEED_MATCHES.slice(); await setJSON(K_MATCHES, ms, true); }
+
+    // migração incremental: acrescenta os jogos do mata-mata se ainda não existirem
+    // (não mexe nos jogos de grupo nem em resultados/placares já lançados)
+    const koVer = await sGet(K_KOVER, true);
+    if(koVer == null){
+      let cur = await getJSON(K_MATCHES,true,[]) || [];
+      const have = new Set(cur.map(m=>m.id));
+      let added = false;
+      for(const km of KNOCKOUT_MATCHES){ if(!have.has(km.id)){ cur.push({...km}); added = true; } }
+      if(added) await setJSON(K_MATCHES, cur, true);
+      await sSet(K_KOVER, "1", true);
+    }
 
     let ps = await getJSON(K_PLAYERS,true,null);
     if(!ps){ await setJSON(K_PLAYERS, SEED_PLAYERS.slice(), true); }
@@ -273,8 +342,6 @@ export default function ChalanasBet(){
     showToast(`Bora, ${p.name.split(" ")[0]}! Boa sorte ⚽`);
   },[refresh,showToast]);
 
-  const logout = useCallback(async ()=>{ await sSet(K_ME,"",false); setMeId(null); },[]);
-
   /* ----- salvar palpite ----- */
   const saveBet = useCallback(async (matchId, h, a)=>{
     if(!meId) return;
@@ -296,6 +363,8 @@ export default function ChalanasBet(){
   },[]);
   const saveMatches = useCallback(async (ms)=>{ setMatches(ms); await setJSON(K_MATCHES, ms, true); },[]);
   const saveSettings = useCallback(async (st)=>{ setSettings(st); await setJSON(K_SETTINGS, st, true); },[]);
+  // admin: salvar jogadores (usado pelo ajuste manual de pontos)
+  const savePlayers = useCallback(async (ps)=>{ setPlayers(ps); await setJSON(K_PLAYERS, ps, true); },[]);
 
   /* ----- rankings ----- */
   const totals = useMemo(()=>{
@@ -305,8 +374,9 @@ export default function ChalanasBet(){
         const r = scoreMatch(bets[p.id]?.[m.id], m, p.favTeam);
         computed += r.pts; perMatch[m.id]=r;
       }
-      const total = (p.base||0) + computed;
-      return { ...p, computed, total, perMatch };
+      const adj = Number(p.adj) || 0;        // ajuste manual do organizador
+      const total = (p.base||0) + computed + adj;
+      return { ...p, adj, computed, total, perMatch };
     }).sort((a,b)=> b.total-a.total || (a.seedRank??999)-(b.seedRank??999) || a.name.localeCompare(b.name,"pt"));
   },[players,matches,bets]);
 
@@ -315,29 +385,32 @@ export default function ChalanasBet(){
 
   if(!loaded) return <Splash/>;
 
+  const isAdminUser = !!me && ADMIN_USERS.includes(norm(me.name));
+  const safeTab = (tab==="admin" && !isAdminUser) ? "ranking" : tab;
+
   return (
     <div className="cb-root">
       <StyleTag/>
       <Pitch/>
       <div className="cb-shell">
-        <Header me={me} onLogout={logout} totals={totals}/>
+        <Header me={me} totals={totals}/>
         {!me ? (
           <Onboarding onLogin={login}/>
         ) : (
           <>
-            <Nav tab={tab} setTab={setTab}/>
-            {tab==="jogos" && (
+            <Nav tab={safeTab} setTab={setTab} isAdminUser={isAdminUser}/>
+            {safeTab==="ranking" && (
+              <RankingTab totals={totals} matches={matches} last4={last4} bets={bets}/>
+            )}
+            {safeTab==="jogos" && (
               <JogosTab matches={matches} players={players} bets={bets} me={me} now={now}
                         settings={settings} onSaveBet={saveBet}/>
             )}
-            {tab==="ranking" && (
-              <RankingTab totals={totals} matches={matches} last4={last4} bets={bets}/>
-            )}
-            {tab==="regras" && <RegrasTab/>}
-            {tab==="admin" && (
+            {safeTab==="regras" && <RegrasTab/>}
+            {safeTab==="admin" && isAdminUser && (
               <AdminTab matches={matches} settings={settings} players={players} bets={bets}
-                        onSaveMatches={saveMatches} onSaveBetFor={saveBetFor}
-                        onSaveSettings={saveSettings} onReseed={()=>saveMatches(SEED_MATCHES)} showToast={showToast}/>
+                        onSaveMatches={saveMatches} onSaveBetFor={saveBetFor} onSavePlayers={savePlayers}
+                        onSaveSettings={saveSettings} showToast={showToast}/>
             )}
           </>
         )}
@@ -352,12 +425,15 @@ export default function ChalanasBet(){
 
 function Splash(){ return (<div className="cb-root"><StyleTag/><div className="cb-splash"><span className="cb-ball">⚽</span><b>CHALANA'S BET</b></div></div>); }
 
-function Header({me,onLogout,totals}){
+function Header({me,totals}){
   const myRank = me ? totals.findIndex(t=>t.id===me.id)+1 : 0;
   return (
     <header className="cb-header">
       <div className="cb-brand">
-        <div className="cb-shield"><Shield size={20} strokeWidth={2.5}/><span className="cb-shield-ball">⚽</span></div>
+        <div className="cb-shield">
+          <img className="cb-logo-img" src="/logo-chalanas.png" alt="Chalana's Bet"
+               onError={(e)=>{ e.currentTarget.style.display="none"; }}/>
+        </div>
         <div>
           <h1>CHALANA'S BET</h1>
           <p>Bolão Copa do Mundo 2026</p>
@@ -369,7 +445,6 @@ function Header({me,onLogout,totals}){
             <span className="cb-me-name">{me.name}</span>
             <span className="cb-me-fav">{flag(me.favTeam)} {me.favTeam} · {myRank}º lugar</span>
           </div>
-          <button className="cb-icon-btn" title="Trocar jogador" onClick={onLogout}><LogOut size={16}/></button>
         </div>
       )}
     </header>
@@ -401,14 +476,15 @@ function Onboarding({onLogin}){
         <button className="cb-btn cb-btn-primary cb-btn-block" disabled={!can} onClick={()=>onLogin(name,fav)}>
           Entrar no Chalana's Bet
         </button>
-        <p className="cb-onb-note">Já entrou antes? Digite o mesmo nome para voltar à sua conta.</p>
+        <p className="cb-onb-note">Atenção: depois de entrar, o nome fica <b>fixo neste aparelho</b> — confira antes de confirmar.</p>
       </div>
     </div>
   );
 }
 
-function Nav({tab,setTab}){
-  const items = [["jogos","Jogos",Calendar],["ranking","Ranking",Trophy],["regras","Regras",Shield],["admin","Admin",Settings]];
+function Nav({tab,setTab,isAdminUser}){
+  const items = [["ranking","Ranking",Trophy],["jogos","Jogos",Calendar],["regras","Regras",Shield]];
+  if(isAdminUser) items.push(["admin","Admin",Settings]);
   return (
     <nav className="cb-nav">
       {items.map(([k,label,Icon])=>(
@@ -421,34 +497,61 @@ function Nav({tab,setTab}){
 }
 
 /* ---------------------------- JOGOS ---------------------------- */
+function RoundTabs({rounds,sel,setSel}){
+  return (
+    <div className="cb-rtabs">
+      {rounds.map(r=>(
+        <button key={r} className={"cb-rtab"+(r===sel?" cb-rtab-on":"")} onClick={()=>setSel(r)}>
+          {ROUND_LABEL(r)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function JogosTab({matches,players,bets,me,now,settings,onSaveBet}){
-  // agrupa por rodada -> data
-  const groups = useMemo(()=>{
-    const byR = {};
-    [...matches].sort((a,b)=> ROUND_ORDER(a.rodada)-ROUND_ORDER(b.rodada) || kickoffMs(a)-kickoffMs(b))
-      .forEach(m=>{ (byR[m.rodada] = byR[m.rodada]||[]).push(m); });
-    return Object.entries(byR).map(([rodada,ms])=>{
-      const byD = {};
-      ms.forEach(m=>{ (byD[m.date]=byD[m.date]||[]).push(m); });
-      return { rodada, days:Object.entries(byD).sort((a,b)=>a[0].localeCompare(b[0])) };
-    });
-  },[matches]);
+  // rodadas presentes, na ordem oficial
+  const rounds = useMemo(()=>[...new Set(matches.map(m=>m.rodada))]
+    .sort((a,b)=>ROUND_ORDER(a)-ROUND_ORDER(b)),[matches]);
+
+  // rodada inicial: a primeira que ainda tem jogo por acontecer (senão a última)
+  const firstOpen = useMemo(()=>{
+    for(const r of rounds){ if(matches.some(m=>m.rodada===r && !m.finished)) return r; }
+    return rounds[rounds.length-1];
+  },[rounds,matches]);
+
+  const [sel,setSel] = useState(null);
+  useEffect(()=>{ if(sel==null && firstOpen) setSel(firstOpen); },[firstOpen,sel]);
+  const cur = sel || firstOpen;
+
+  // jogos da rodada selecionada, agrupados por data
+  const days = useMemo(()=>{
+    const ms = matches.filter(m=>m.rodada===cur)
+      .sort((a,b)=> kickoffMs(a)-kickoffMs(b));
+    const byD = {};
+    ms.forEach(m=>{ (byD[m.date]=byD[m.date]||[]).push(m); });
+    return Object.entries(byD).sort((a,b)=>a[0].localeCompare(b[0]));
+  },[matches,cur]);
 
   return (
     <div className="cb-page">
-      {groups.map(g=>(
-        <section key={g.rodada} className="cb-round">
-          <div className="cb-round-head"><span className="cb-round-tag">Fase de grupos</span><h3>{g.rodada}</h3></div>
-          {g.days.map(([date,ms])=>(
-            <div key={date} className="cb-day">
-              <div className="cb-day-label"><Calendar size={13}/> {dateLabel(date)}</div>
-              <div className="cb-matches">
-                {ms.map(m=> <MatchCard key={m.id} m={m} players={players} bets={bets} me={me} now={now} settings={settings} onSaveBet={onSaveBet}/>)}
+      <RoundTabs rounds={rounds} sel={cur} setSel={setSel}/>
+      <section className="cb-round">
+        <div className="cb-round-head">
+          <span className="cb-round-tag">{isGroupRound(cur)?"Fase de grupos":"Mata-mata"}</span>
+          <h3>{ROUND_LABEL(cur)}</h3>
+        </div>
+        {days.length===0
+          ? <div className="cb-empty">Nenhum jogo nesta rodada.</div>
+          : days.map(([date,ms])=>(
+              <div key={date} className="cb-day">
+                <div className="cb-day-label"><Calendar size={13}/> {dateLabel(date)}</div>
+                <div className="cb-matches">
+                  {ms.map(m=> <MatchCard key={m.id} m={m} players={players} bets={bets} me={me} now={now} settings={settings} onSaveBet={onSaveBet}/>)}
+                </div>
               </div>
-            </div>
-          ))}
-        </section>
-      ))}
+            ))}
+      </section>
     </div>
   );
 }
@@ -456,59 +559,72 @@ function JogosTab({matches,players,bets,me,now,settings,onSaveBet}){
 function MatchCard({m,players,bets,me,now,settings,onSaveBet}){
   const [open,setOpen] = useState(false);
   const kMs = kickoffMs(m);
-  const lockMin = m.lockMin ?? 15;
+  const lockMin = m.lockMin ?? 10;
   const lockMs = kMs - lockMin*60*1000;
   const locked = now >= lockMs;
+  const defined = teamsSet(m);              // confronto definido?
   const mine = bets[me.id]?.[m.id];
   const [h,setH] = useState(mine?.h ?? "");
   const [a,setA] = useState(mine?.a ?? "");
   useEffect(()=>{ setH(mine?.h ?? ""); setA(mine?.a ?? ""); },[mine?.h,mine?.a]);
 
   const dirty = String(h)!==String(mine?.h ?? "") || String(a)!==String(mine?.a ?? "");
-  const editable = !m.finished && !locked;
+  const editable = defined && !m.finished && !locked;
   const betCount = players.filter(p=> bets[p.id]?.[m.id]).length;
   const revealOthers = m.finished || locked || settings.revealBeforeLock;
 
   let status, statusClass;
   if(m.finished){ status="Encerrado"; statusClass="cb-st-done"; }
+  else if(!defined){ status="A definir"; statusClass="cb-st-tbd"; }
   else if(locked){ status="Palpites fechados"; statusClass="cb-st-lock"; }
   else status = "Fecha em " + timeLeft(lockMs-now);
 
   return (
-    <div className={"cb-match"+(m.finished?" cb-match-done":"")}>
+    <div className={"cb-match"+(m.finished?" cb-match-done":"")+(!defined?" cb-match-tbd":"")}>
       <div className="cb-match-top">
         <span className="cb-time">{m.time}</span>
         <div className="cb-top-right">
-          {!m.finished && lockMin!==15 && (
+          {!m.finished && defined && lockMin!==10 && (
             <span className="cb-window" title="Janela de palpites antes do jogo">trava {lockMin>=60?`${lockMin/60}h`:`${lockMin}min`} antes</span>
           )}
           <span className={"cb-status "+(statusClass||"cb-st-open")}>
-            {(!m.finished && locked) && <Lock size={11}/>}{status}
+            {(!m.finished && defined && locked) && <Lock size={11}/>}{status}
           </span>
         </div>
       </div>
 
       {/* placar estilo painel */}
       <div className="cb-score">
-        <div className="cb-team cb-team-h"><span className="cb-flag">{flag(m.home)}</span><span className="cb-tname">{m.home}</span></div>
+        <div className="cb-team cb-team-h">
+          <span className="cb-flag">{sideFlag(m,"h")}</span>
+          <span className={"cb-tname"+(m.home?"":" cb-tname-tbd")}>{sideName(m,"h")}</span>
+        </div>
         <div className="cb-score-box">
           {m.finished
             ? <><b>{m.realH}</b><i>×</i><b>{m.realA}</b></>
             : <><b className="cb-vs">VS</b></>}
         </div>
-        <div className="cb-team cb-team-a"><span className="cb-tname">{m.away}</span><span className="cb-flag">{flag(m.away)}</span></div>
+        <div className="cb-team cb-team-a">
+          <span className={"cb-tname"+(m.away?"":" cb-tname-tbd")}>{sideName(m,"a")}</span>
+          <span className="cb-flag">{sideFlag(m,"a")}</span>
+        </div>
       </div>
 
+      {/* confronto ainda não definido */}
+      {!m.finished && !defined && (
+        <div className="cb-tbdnote">Confronto definido após a fase de grupos. Os palpites abrem quando os times forem confirmados.</div>
+      )}
+
       {/* meu palpite */}
-      {!m.finished && (
+      {!m.finished && defined && (
         <div className="cb-betrow">
           <span className="cb-betlabel">Seu palpite</span>
           <div className="cb-betinputs">
             <input className="cb-pick" type="number" min="0" max="19" inputMode="numeric"
-                   disabled={!editable} value={h} onChange={e=>setH(e.target.value)} aria-label={`gols ${m.home}`}/>
+                   disabled={!editable} value={h} onChange={e=>setH(e.target.value)} aria-label={`gols ${sideName(m,"h")}`}/>
             <span className="cb-x">×</span>
             <input className="cb-pick" type="number" min="0" max="19" inputMode="numeric"
-                   disabled={!editable} value={a} onChange={e=>setA(e.target.value)} aria-label={`gols ${m.away}`}/>
+                   disabled={!editable} value={a} onChange={e=>setA(e.target.value)} aria-label={`gols ${sideName(m,"a")}`}/>
             {editable
               ? <button className="cb-btn cb-btn-sm cb-btn-primary" disabled={!dirty || h===""||a===""}
                         onClick={()=>onSaveBet(m.id,h,a)}>{mine?"Atualizar":"Salvar"}</button>
@@ -619,7 +735,7 @@ function RankingTab({totals,matches,last4,bets}){
                   <span className="cb-pos">{i+1}</span>
                   <div className="cb-row-main">
                     <span className="cb-row-name">{flag(p.favTeam)} {p.name}</span>
-                    <span className="cb-row-fav">{p.favTeam}{p.base?` · base ${fmtPts(p.base)}`:""}{p.computed?` · rodadas ${p.computed>0?"+":""}${fmtPts(p.computed)}`:""}</span>
+                    <span className="cb-row-fav">{p.favTeam}{p.base?` · base ${fmtPts(p.base)}`:""}{p.computed?` · rodadas ${p.computed>0?"+":""}${fmtPts(p.computed)}`:""}{p.adj?` · ajuste ${p.adj>0?"+":""}${fmtPts(p.adj)}`:""}</span>
                   </div>
                   <span className="cb-row-pts">{fmtPts(p.total)}<i>pts</i></span>
                 </div>
@@ -689,7 +805,7 @@ function RegrasTab(){
         <div className="cb-rules-note">
           O <b>vencedor (3)</b> soma com o <b>placar parcial (1)</b>. O empate exato conta como placar exato (<b>5</b>),
           e o parcial vale também quando o jogo termina empatado. O bônus do <b>favorito</b> sempre soma por cima.
-          Os palpites travam <b>15 minutos antes</b> de cada jogo (2h nos jogos de hoje).
+          Os palpites travam <b>10 minutos antes</b> de cada jogo. Nos jogos de mata-mata, o palpite só abre depois que os times são confirmados.
         </div>
       </section>
     </div>
@@ -737,11 +853,11 @@ function AdminBets({matches,players,bets,onSaveBetFor,showToast}){
       <p className="cb-admin-p">Escolha o jogo e digite o placar de cada jogador. Em branco = sem palpite. Útil para subir palpites feitos fora do app.</p>
       <div className="cb-select-wrap cb-be-select">
         <select className="cb-select" value={mid} onChange={e=>setMid(e.target.value)}>
-          {ordered.map(x=> <option key={x.id} value={x.id}>{x.home} × {x.away} — {dateLabel(x.date)} {x.time}{x.finished?" ✓":""}</option>)}
+          {ordered.map(x=> <option key={x.id} value={x.id}>{matchLabel(x)} — {dateLabel(x.date)} {x.time}{x.finished?" ✓":""}</option>)}
         </select>
         <ChevronDown size={16} className="cb-select-caret"/>
       </div>
-      {m && <div className="cb-be-head">{flag(m.home)} {m.home} <b>×</b> {m.away} {flag(m.away)}</div>}
+      {m && <div className="cb-be-head">{sideFlag(m,"h")} {sideName(m,"h")} <b>×</b> {sideName(m,"a")} {sideFlag(m,"a")}</div>}
       <div className="cb-betentry">
         {players.map(p=>(
           <div key={p.id} className="cb-be-row">
@@ -761,13 +877,57 @@ function AdminBets({matches,players,bets,onSaveBetFor,showToast}){
   );
 }
 
+/* ---------------------------- ADMIN: AJUSTE MANUAL DE PONTOS ---------------------------- */
+function AdminAdjust({players,onSavePlayers,showToast}){
+  const ordered = useMemo(()=> [...players].sort((a,b)=> (a.seedRank??999)-(b.seedRank??999) || a.name.localeCompare(b.name,"pt")), [players]);
+  const [vals,setVals] = useState(()=>{ const v={}; players.forEach(p=>{ v[p.id]=String(p.adj ?? ""); }); return v; });
+  const [saving,setSaving] = useState(false);
+
+  useEffect(()=>{ setVals(v=>{ const nv={...v}; players.forEach(p=>{ if(nv[p.id]===undefined) nv[p.id]=String(p.adj ?? ""); }); return nv; }); },[players]);
+
+  async function salvar(){
+    setSaving(true);
+    const next = players.map(p=>{
+      const raw = (vals[p.id] ?? "").toString().replace(",", ".").trim();
+      const adj = raw==="" ? 0 : (Number(raw) || 0);
+      return { ...p, adj };
+    });
+    await onSavePlayers(next);
+    setSaving(false);
+    showToast("Ajustes salvos");
+  }
+
+  return (
+    <section className="cb-block">
+      <h3 className="cb-block-title"><Sliders size={15}/> Ajuste manual de pontos</h3>
+      <p className="cb-admin-p">Correção em cima do total calculado. Use valores com sinal (ex.: <b>2</b>, <b>-1,5</b>). Em branco = 0. Não substitui a pontuação automática — soma/subtrai por cima dela.</p>
+      <div className="cb-betentry">
+        {ordered.map(p=>(
+          <div key={p.id} className="cb-be-row">
+            <span className="cb-be-name">{flag(p.favTeam)} {p.name}</span>
+            <input className="cb-input cb-adj-input" inputMode="decimal" placeholder="0"
+                   value={vals[p.id] ?? ""} onChange={e=>setVals(v=>({...v,[p.id]:e.target.value}))}/>
+          </div>
+        ))}
+      </div>
+      <button className="cb-btn cb-btn-primary cb-btn-block" disabled={saving} onClick={salvar}>
+        <Check size={15}/> {saving ? "Salvando…" : "Salvar ajustes"}
+      </button>
+    </section>
+  );
+}
+
 /* ---------------------------- ADMIN ---------------------------- */
-function AdminTab({matches,settings,players,bets,onSaveMatches,onSaveBetFor,onSaveSettings,onReseed,showToast}){
+function AdminTab({matches,settings,players,bets,onSaveMatches,onSaveBetFor,onSavePlayers,onSaveSettings,showToast}){
   const [pin,setPin] = useState("");
   const [ok,setOk] = useState(false);
   const [draft,setDraft] = useState(matches);
   const [iaStatus,setIaStatus] = useState(null);
+  const [arRound,setArRound] = useState(null);   // filtro de rodada na lista de jogos
   // draft é inicializado uma vez (useState). Não re-sincroniza no refresh para não apagar edições.
+
+  const draftRounds = useMemo(()=>[...new Set(draft.map(m=>m.rodada))].sort((a,b)=>ROUND_ORDER(a)-ROUND_ORDER(b)),[draft]);
+  useEffect(()=>{ if(arRound==null && draftRounds.length) setArRound(draftRounds[0]); },[draftRounds,arRound]);
 
   if(!ok) return (
     <div className="cb-page">
@@ -782,11 +942,11 @@ function AdminTab({matches,settings,players,bets,onSaveMatches,onSaveBetFor,onSa
     </div>
   );
 
+  const curRound = arRound || draftRounds[0];
   const upd = (id,patch)=> setDraft(d=> d.map(m=> m.id===id? {...m,...patch}: m));
-  const addMatch = ()=> setDraft(d=> [...d, { id:"m-"+Date.now().toString(36), rodada:"2ª rodada", date:"2026-06-22", time:"16:00", home:"Brasil", away:"Marrocos", lockMin:15, realH:null, realA:null, finished:false }]);
+  const addMatch = ()=> setDraft(d=> [...d, { id:"m-"+Date.now().toString(36), rodada:curRound||"2ª rodada", date:"2026-06-22", time:"16:00", home:null, away:null, slotH:"", slotA:"", lockMin:10, realH:null, realA:null, finished:false }]);
   const del = (id)=> setDraft(d=> d.filter(m=> m.id!==id));
   const save = ()=>{ onSaveMatches(draft); showToast("Tabela salva para todos"); };
-  const reseed = ()=>{ setDraft(SEED_MATCHES); onReseed(); showToast("Tabela oficial restaurada"); };
 
   async function atualizarIA(){
     setIaStatus("Buscando dados oficiais (datas, horários e placares)…");
@@ -797,6 +957,7 @@ function AdminTab({matches,settings,players,bets,onSaveMatches,onSaveBetFor,onSa
       const arr = Array.isArray(data.matches) ? data.matches : [];
       let applied=0;
       const next = draft.map(m=>{
+        if(!teamsSet(m)) return m;
         const hit = arr.find(r=> (teamKey(r.home)===teamKey(m.home) && teamKey(r.away)===teamKey(m.away))
                               || (teamKey(r.home)===teamKey(m.away) && teamKey(r.away)===teamKey(m.home)));
         if(!hit) return m;
@@ -819,6 +980,8 @@ function AdminTab({matches,settings,players,bets,onSaveMatches,onSaveBetFor,onSa
     }
   }
 
+  const draftFiltered = draft.filter(m=>m.rodada===curRound).sort((a,b)=>kickoffMs(a)-kickoffMs(b));
+
   return (
     <div className="cb-page">
       <section className="cb-block">
@@ -826,10 +989,11 @@ function AdminTab({matches,settings,players,bets,onSaveMatches,onSaveBetFor,onSa
         <p className="cb-admin-p">Busca placares finais da Copa 2026 na web e preenche os jogos da tabela. É um apoio — confira sempre antes de salvar.</p>
         <div className="cb-admin-actions">
           <button className="cb-btn cb-btn-primary" onClick={atualizarIA}><RefreshCw size={14}/> Atualizar via IA</button>
-          <button className="cb-btn cb-btn-ghost" onClick={reseed}>Restaurar tabela oficial</button>
         </div>
         {iaStatus && <div className="cb-iastatus">{iaStatus}</div>}
       </section>
+
+      <AdminAdjust players={players} onSavePlayers={onSavePlayers} showToast={showToast}/>
 
       <AdminBets matches={matches} players={players} bets={bets} onSaveBetFor={onSaveBetFor} showToast={showToast}/>
 
@@ -845,26 +1009,33 @@ function AdminTab({matches,settings,players,bets,onSaveMatches,onSaveBetFor,onSa
           <span>Mostrar palpites dos outros antes do jogo fechar</span>
         </label>
 
+        <RoundTabs rounds={draftRounds} sel={curRound} setSel={setArRound}/>
+
         <div className="cb-adminlist">
-          {draft.map(m=>(
+          {draftFiltered.map(m=>(
             <div key={m.id} className="cb-adminrow">
+              {!teamsSet(m) && (m.slotH||m.slotA) && (
+                <div className="cb-ar-slot">{m.slotH||"?"} <b>×</b> {m.slotA||"?"}</div>
+              )}
               <div className="cb-ar-line">
                 <input className="cb-input cb-ar-round" value={m.rodada} onChange={e=>upd(m.id,{rodada:e.target.value})}/>
                 <input className="cb-input cb-ar-date" type="date" value={m.date} onChange={e=>upd(m.id,{date:e.target.value})}/>
                 <input className="cb-input cb-ar-time" type="time" value={m.time} onChange={e=>upd(m.id,{time:e.target.value})}/>
-                <input className="cb-input cb-ar-lock" type="number" min="0" title="Trava: minutos antes do jogo" value={m.lockMin??15} onChange={e=>upd(m.id,{lockMin:e.target.value===""?15:parseInt(e.target.value,10)})}/>
+                <input className="cb-input cb-ar-lock" type="number" min="0" title="Trava: minutos antes do jogo" value={m.lockMin??10} onChange={e=>upd(m.id,{lockMin:e.target.value===""?10:parseInt(e.target.value,10)})}/>
                 <span className="cb-ar-locku">min</span>
                 <button className="cb-icon-btn cb-del" onClick={()=>del(m.id)}><X size={14}/></button>
               </div>
               <div className="cb-ar-line">
-                <select className="cb-select cb-ar-team" value={m.home} onChange={e=>upd(m.id,{home:e.target.value})}>
-                  {FAV_TEAMS.map(t=><option key={t}>{t}</option>)}
+                <select className="cb-select cb-ar-team" value={m.home||""} onChange={e=>upd(m.id,{home:e.target.value||null})}>
+                  <option value="">— a definir —</option>
+                  {FAV_TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
                 </select>
                 <input className="cb-pick cb-ar-sc" type="number" min="0" placeholder="-" value={m.realH??""} onChange={e=>upd(m.id,{realH:e.target.value===""?null:parseInt(e.target.value,10)})}/>
                 <span className="cb-x">×</span>
                 <input className="cb-pick cb-ar-sc" type="number" min="0" placeholder="-" value={m.realA??""} onChange={e=>upd(m.id,{realA:e.target.value===""?null:parseInt(e.target.value,10)})}/>
-                <select className="cb-select cb-ar-team" value={m.away} onChange={e=>upd(m.id,{away:e.target.value})}>
-                  {FAV_TEAMS.map(t=><option key={t}>{t}</option>)}
+                <select className="cb-select cb-ar-team" value={m.away||""} onChange={e=>upd(m.id,{away:e.target.value||null})}>
+                  <option value="">— a definir —</option>
+                  {FAV_TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <label className="cb-switch cb-switch-sm">
@@ -907,9 +1078,10 @@ function StyleTag(){
 /* header */
 .cb-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;}
 .cb-brand{display:flex;align-items:center;gap:12px;}
-.cb-shield{position:relative;width:42px;height:42px;display:grid;place-items:center;border-radius:11px;
+.cb-shield{position:relative;width:42px;height:42px;display:grid;place-items:center;border-radius:11px;overflow:hidden;
   background:linear-gradient(150deg,var(--amarelo),var(--amarelo2));color:var(--azul2);
   box-shadow:0 6px 18px rgba(0,0,0,.35),inset 0 0 0 2px rgba(255,255,255,.4);}
+.cb-logo-img{width:100%;height:100%;object-fit:cover;display:block;}
 .cb-shield-ball{position:absolute;font-size:13px;bottom:-3px;right:-3px;}
 .cb-brand h1{font-family:'Oswald';font-weight:700;font-size:23px;letter-spacing:.5px;margin:0;line-height:1;}
 .cb-brand p{margin:3px 0 0;font-size:12px;color:var(--muted);letter-spacing:.3px;}
@@ -928,6 +1100,15 @@ function StyleTag(){
   background:transparent;color:var(--muted);font-family:'Inter';font-weight:600;font-size:13px;cursor:pointer;transition:.15s;}
 .cb-tab:hover{color:var(--branco);}
 .cb-tab-on{background:linear-gradient(180deg,var(--verde),var(--verde2));color:#fff;box-shadow:0 4px 12px rgba(10,166,74,.4);}
+
+/* abas de rodada (pills) */
+.cb-rtabs{display:flex;gap:7px;overflow-x:auto;padding:2px 2px 6px;margin-bottom:4px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.cb-rtabs::-webkit-scrollbar{display:none;}
+.cb-rtab{flex:0 0 auto;white-space:nowrap;border:1px solid var(--line);background:var(--panel);color:var(--muted);
+  font-family:'Inter';font-weight:600;font-size:12.5px;padding:8px 14px;border-radius:999px;cursor:pointer;transition:.15s;}
+.cb-rtab:hover{color:var(--branco);border-color:rgba(255,255,255,.25);}
+.cb-rtab-on{background:linear-gradient(180deg,var(--verde),var(--verde2));color:#fff;border-color:transparent;
+  box-shadow:0 4px 12px rgba(10,166,74,.35);}
 
 /* onboarding */
 .cb-onb{display:flex;justify-content:center;padding-top:10px;}
@@ -986,6 +1167,10 @@ function StyleTag(){
 .cb-st-open{color:#bfe9cf;background:rgba(52,210,123,.12);}
 .cb-st-lock{color:#ffd9a8;background:rgba(255,150,0,.14);}
 .cb-st-done{color:var(--azul2);background:var(--amarelo);}
+.cb-st-tbd{color:#bcd0ff;background:rgba(120,150,255,.14);}
+.cb-match-tbd{opacity:.96;border-style:dashed;}
+.cb-tname-tbd{color:var(--muted);font-weight:600;font-size:12px;font-style:italic;}
+.cb-tbdnote{border-top:1px solid var(--line);padding-top:9px;margin-top:2px;font-size:11.5px;color:var(--muted);line-height:1.45;}
 
 .cb-score{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin:4px 0 10px;}
 .cb-team{display:flex;align-items:center;gap:8px;min-width:0;}
@@ -999,9 +1184,9 @@ function StyleTag(){
 .cb-vs{font-size:14px!important;color:var(--muted)!important;letter-spacing:1px;}
 
 /* bet row */
-.cb-betrow{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding-top:10px;}
-.cb-betlabel{font-size:12px;font-weight:600;color:var(--muted);}
-.cb-betinputs{display:flex;align-items:center;gap:7px;}
+.cb-betrow{display:flex;align-items:center;justify-content:space-between;gap:8px 10px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px;}
+.cb-betlabel{font-size:11.5px;font-weight:600;color:var(--muted);flex:0 0 auto;white-space:nowrap;text-transform:uppercase;letter-spacing:.4px;}
+.cb-betinputs{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;}
 .cb-pick{width:42px;height:38px;text-align:center;background:#0a1c12;border:1px solid var(--line);border-radius:9px;
   color:var(--branco);font-family:'Oswald';font-size:18px;font-weight:600;outline:none;-moz-appearance:textfield;}
 .cb-pick::-webkit-outer-spin-button,.cb-pick::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
@@ -1101,6 +1286,9 @@ function StyleTag(){
 .cb-switch-sm{margin:7px 0 0;font-size:11.5px;}
 .cb-adminlist{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
 .cb-adminrow{background:#0a1c12;border:1px solid var(--line);border-radius:11px;padding:10px;}
+.cb-ar-slot{font-size:11.5px;color:var(--muted);font-weight:600;margin-bottom:7px;padding-bottom:6px;border-bottom:1px dashed var(--line);}
+.cb-ar-slot b{color:var(--amarelo);font-family:'Oswald';}
+.cb-adj-input{width:84px;flex:none;text-align:center;font-family:'Oswald';font-weight:600;font-size:16px;padding:8px;}
 .cb-ar-line{display:flex;align-items:center;gap:7px;margin-bottom:7px;}
 .cb-ar-line:last-child{margin-bottom:0;}
 .cb-ar-round{flex:1;min-width:0;font-size:12px;padding:8px 10px;}
@@ -1135,7 +1323,7 @@ function StyleTag(){
   .cb-brand h1{font-size:20px;} .cb-tab span{display:none;} .cb-tab{padding:10px;}
   .cb-results{grid-template-columns:1fr;}
   .cb-ar-line{flex-wrap:wrap;} .cb-ar-date,.cb-ar-time{width:auto;flex:1;}
-  .cb-me-info{display:none;}
+  .cb-me{padding:6px 10px;} .cb-me-name{font-size:12px;} .cb-me-fav{font-size:10px;}
 }
 @media(prefers-reduced-motion:reduce){.cb-ball{animation:none;}}
 `}</style>;
