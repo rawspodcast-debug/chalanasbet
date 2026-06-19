@@ -1,0 +1,6 @@
+git init
+git add .
+git commit -m "Chalana's Bet"
+git branch -M main
+git remote add origin https://github.com/SEU-USUARIO/chalanas-bet.git
+git push -u origin main
