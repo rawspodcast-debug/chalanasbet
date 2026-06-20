@@ -170,7 +170,7 @@ const SEED_BETS = {
 };
 
 // sobe quando o seed muda; dispara migração da base nos jogadores já cadastrados
-const SEED_VERSION = 3;
+const SEED_VERSION = 4;
 
 /* ---------- armazenamento ----------
    sGet/sSet/sList vêm de ./supabase:
@@ -306,13 +306,13 @@ export default function ChalanasBet(){
       }
     }
 
-    // migração: aplica a pontuação-base e a ordem de desempate aos jogadores já cadastrados
+    // migração: aplica pontuação-base, ordem de desempate e TIME PREFERIDO (oficial/fixo) aos jogadores já cadastrados
     const ver = await sGet(K_SEEDVER, true);
     if(ver !== String(SEED_VERSION)){
       let cur = await getJSON(K_PLAYERS,true,[]) || [];
       cur = cur.map(p=>{
         const sp = SEED_PLAYERS.find(s=> s.id===p.id) || SEED_PLAYERS.find(s=> norm(s.name)===norm(p.name));
-        return sp ? { ...p, base: sp.base, seedRank: sp.seedRank } : p;
+        return sp ? { ...p, base: sp.base, seedRank: sp.seedRank, favTeam: sp.favTeam } : p;
       });
       await setJSON(K_PLAYERS, cur, true);
       await sSet(K_SEEDVER, String(SEED_VERSION), true);
@@ -345,7 +345,7 @@ export default function ChalanasBet(){
     if(REMOVED_PLAYERS.has(norm(name))){ showToast("Esse apostador foi removido do bolão."); return; }
     const ps = await getJSON(K_PLAYERS,true,[]) || [];
     let p = ps.find(x=> norm(x.name)===norm(name));
-    if(p){ if(fav && p.favTeam!==fav){ p.favTeam=fav; await setJSON(K_PLAYERS, ps, true); } }
+    if(p){ /* time preferido fixo: re-login não altera mais o favTeam */ }
     else { p = { id:"p-"+Date.now().toString(36)+Math.random().toString(36).slice(2,6), name:name.trim(), favTeam:fav, createdAt:Date.now() }; ps.push(p); await setJSON(K_PLAYERS, ps, true); }
     await sSet(K_ME, p.id, false);
     setMeId(p.id);
@@ -425,7 +425,7 @@ export default function ChalanasBet(){
             )}
           </>
         )}
-        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT) · <span style={{opacity:.65}}>build v7</span></footer>
+        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT) · <span style={{opacity:.65}}>build v8</span></footer>
       </div>
       {toast && <div className="cb-toast">{toast}</div>}
     </div>
