@@ -414,7 +414,7 @@ export default function ChalanasBet(){
             )}
           </>
         )}
-        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT)</footer>
+        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT) · <span style={{opacity:.65}}>build v5</span></footer>
       </div>
       {toast && <div className="cb-toast">{toast}</div>}
     </div>
