@@ -1157,7 +1157,7 @@ function StyleTag(){
 .cb-matches{display:flex;flex-direction:column;gap:10px;}
 
 /* match card */
-.cb-match{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:13px 14px;}
+.cb-match{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:13px 14px;display:flex;flex-direction:column;min-width:0;}
 .cb-match-done{background:linear-gradient(180deg,var(--panel2),var(--panel));border-color:rgba(255,210,0,.18);}
 .cb-match-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
 .cb-top-right{display:flex;align-items:center;gap:7px;}
