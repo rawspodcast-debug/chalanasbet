@@ -414,7 +414,7 @@ export default function ChalanasBet(){
             )}
           </>
         )}
-        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT) · <span style={{opacity:.65}}>build v5</span></footer>
+        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT) · <span style={{opacity:.65}}>build v6</span></footer>
       </div>
       {toast && <div className="cb-toast">{toast}</div>}
     </div>
@@ -732,7 +732,7 @@ function RankingTab({totals,matches,last4,bets}){
           : <div className="cb-table">
               {totals.map((p,i)=>(
                 <div key={p.id} className={"cb-row"+(i<3?` cb-row-top cb-row-${i+1}`:"")}>
-                  <span className="cb-pos">{i+1}</span>
+                  <span className="cb-rank-pos">{i+1}</span>
                   <div className="cb-row-main">
                     <span className="cb-row-name">{flag(p.favTeam)} {p.name}</span>
                     <span className="cb-row-fav">{p.favTeam}{p.base?` · base ${fmtPts(p.base)}`:""}{p.computed?` · rodadas ${p.computed>0?"+":""}${fmtPts(p.computed)}`:""}{p.adj?` · ajuste ${p.adj>0?"+":""}${fmtPts(p.adj)}`:""}</span>
@@ -1243,12 +1243,12 @@ function StyleTag(){
 /* tabela classificação */
 .cb-table{display:flex;flex-direction:column;gap:6px;}
 .cb-row{display:flex;align-items:center;gap:12px;background:#0a1c12;border:1px solid var(--line);border-radius:11px;padding:10px 13px;}
-.cb-pos{font-family:'Oswald';font-weight:700;font-size:17px;width:30px;height:30px;display:grid;place-items:center;
+.cb-rank-pos{font-family:'Oswald';font-weight:700;font-size:17px;width:30px;height:30px;display:grid;place-items:center;
   border-radius:50%;background:rgba(255,255,255,.06);color:var(--muted);flex:none;}
-.cb-row-top .cb-pos{color:var(--azul2);}
-.cb-row-1 .cb-pos{background:linear-gradient(150deg,#ffe14d,#f4b400);}
-.cb-row-2 .cb-pos{background:linear-gradient(150deg,#e6e6e6,#b9b9b9);}
-.cb-row-3 .cb-pos{background:linear-gradient(150deg,#e8a86b,#c47b3d);}
+.cb-row-top .cb-rank-pos{color:var(--azul2);}
+.cb-row-1 .cb-rank-pos{background:linear-gradient(150deg,#ffe14d,#f4b400);}
+.cb-row-2 .cb-rank-pos{background:linear-gradient(150deg,#e6e6e6,#b9b9b9);}
+.cb-row-3 .cb-rank-pos{background:linear-gradient(150deg,#e8a86b,#c47b3d);}
 .cb-row-main{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3;}
 .cb-row-name{font-weight:700;font-size:14px;}
 .cb-row-fav{font-size:11px;color:var(--muted);}
