@@ -668,7 +668,7 @@ function MyResult({m,bet,fav}){
   const r = scoreMatch(bet,m,fav);
   return (
     <div className={"cb-myresult"+(r.pts>0?" cb-pos":r.pts<0?" cb-neg":"")}>
-      <span>Seu palpite: <b>{bet.h}×{bet.a}</b></span>
+      <span className="cb-mr-bet">Seu palpite: <b>{bet.h}×{bet.a}</b></span>
       <span className="cb-mr-pts">{r.pts>0?"+":""}{fmtPts(r.pts)} pt{Math.abs(r.pts)===1?"":"s"}</span>
       {r.reasons.length>0 && <span className="cb-mr-reason">{r.reasons.join(" · ")}</span>}
     </div>
@@ -1197,13 +1197,14 @@ function StyleTag(){
   font-family:'Oswald';}
 
 /* my result */
-.cb-myresult{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:10px;font-size:12.5px;}
-.cb-myresult b{font-family:'Oswald';}
-.cb-mr-pts{margin-left:auto;font-family:'Oswald';font-weight:700;font-size:15px;}
+.cb-myresult{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;border-top:1px solid var(--line);padding-top:10px;font-size:12.5px;line-height:1.45;width:100%;}
+.cb-myresult b{font-family:'Oswald';white-space:nowrap;}
+.cb-mr-bet{white-space:nowrap;flex:0 1 auto;}
+.cb-mr-pts{margin-left:auto;font-family:'Oswald';font-weight:700;font-size:15px;white-space:nowrap;flex:0 0 auto;}
 .cb-pos .cb-mr-pts,.cb-pos{color:var(--pos);}
 .cb-neg .cb-mr-pts,.cb-neg{color:var(--neg);}
 .cb-myresult.cb-pos{color:var(--branco);} .cb-myresult.cb-neg{color:var(--branco);}
-.cb-mr-reason{flex-basis:100%;color:var(--muted);font-size:11.5px;}
+.cb-mr-reason{flex-basis:100%;color:var(--muted);font-size:11.5px;white-space:normal;}
 .cb-noresult{border-top:1px solid var(--line);padding-top:9px;font-size:12px;color:var(--muted);}
 
 /* all bets */
