@@ -142,7 +142,6 @@ const ADMIN_USERS = ["tiarles","diego paz"];
 // Apostadores pré-cadastrados (tabela enviada). O badge "VOCÊ" aparece para quem estiver logado.
 // base = pontuação acumulada até Suíça × Bósnia (saldo inicial). seedRank = ordem de desempate da tabela.
 const SEED_PLAYERS = [
-  { id:"sp-01", name:"Brunodopivo",     favTeam:"Espanha",   base:0,    seedRank:12, createdAt:1 },
   { id:"sp-02", name:"dinOpehL.",       favTeam:"Brasil",    base:37,   seedRank:11, createdAt:2 },
   { id:"sp-03", name:"Wesley monteiro", favTeam:"França",    base:49,   seedRank:5,  createdAt:3 },
   { id:"sp-04", name:"Duda Pehl",       favTeam:"Brasil",    base:57,   seedRank:2,  createdAt:4 },
@@ -190,6 +189,8 @@ const K_ME = "chalanas:me:v1"; // pessoal (por dispositivo)
 
 /* ---------- utilidades ---------- */
 const norm = (s)=> (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9 ]/g,"").trim();
+// apostadores removidos do bolão (comparação por nome normalizado)
+const REMOVED_PLAYERS = new Set(["brunodopivo","matheus","vitor coelho"]);
 const ALIAS = { "holanda":"paises baixos","eua":"estados unidos","usa":"estados unidos","czechia":"republica tcheca","south korea":"coreia do sul","fmt":"" };
 const teamKey = (t)=>{ let n=norm(t); return ALIAS[n]||n; };
 const kickoffMs = (m)=> new Date(iso(m.date,m.time)).getTime();
@@ -296,6 +297,15 @@ export default function ChalanasBet(){
       if(added) await setJSON(K_PLAYERS, ps, true);
     }
 
+    // remoção definitiva de apostadores que saíram do bolão (limpa a lista viva no Supabase)
+    {
+      let pl = await getJSON(K_PLAYERS,true,[]) || [];
+      if(pl.some(p=>REMOVED_PLAYERS.has(norm(p.name)))){
+        pl = pl.filter(p=>!REMOVED_PLAYERS.has(norm(p.name)));
+        await setJSON(K_PLAYERS, pl, true);
+      }
+    }
+
     // migração: aplica a pontuação-base e a ordem de desempate aos jogadores já cadastrados
     const ver = await sGet(K_SEEDVER, true);
     if(ver !== String(SEED_VERSION)){
@@ -332,6 +342,7 @@ export default function ChalanasBet(){
 
   /* ----- login / cadastro ----- */
   const login = useCallback(async (name, fav)=>{
+    if(REMOVED_PLAYERS.has(norm(name))){ showToast("Esse apostador foi removido do bolão."); return; }
     const ps = await getJSON(K_PLAYERS,true,[]) || [];
     let p = ps.find(x=> norm(x.name)===norm(name));
     if(p){ if(fav && p.favTeam!==fav){ p.favTeam=fav; await setJSON(K_PLAYERS, ps, true); } }
@@ -414,7 +425,7 @@ export default function ChalanasBet(){
             )}
           </>
         )}
-        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT) · <span style={{opacity:.65}}>build v6</span></footer>
+        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT) · <span style={{opacity:.65}}>build v7</span></footer>
       </div>
       {toast && <div className="cb-toast">{toast}</div>}
     </div>
