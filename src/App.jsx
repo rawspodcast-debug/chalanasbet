@@ -1329,7 +1329,7 @@ function StyleTag(){
 .cb-splash{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:14px;
   font-family:'Oswald';font-size:20px;letter-spacing:1px;color:var(--branco);}
 .cb-ball{font-size:40px;animation:spin 1.4s linear infinite;display:inline-flex;}
-.cb-ball-img{width:100px;height:100px;object-fit:contain;display:block;}
+.cb-ball-img{width:150px;height:150px;object-fit:contain;display:block;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
 @media(max-width:540px){
