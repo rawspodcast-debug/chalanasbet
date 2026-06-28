@@ -425,7 +425,7 @@ export default function ChalanasBet(){
             )}
           </>
         )}
-        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT) · <span style={{opacity:.65}}>build v8</span></footer>
+        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT) · <span style={{opacity:.65}}>build v10</span></footer>
       </div>
       {toast && <div className="cb-toast">{toast}</div>}
     </div>
@@ -434,7 +434,7 @@ export default function ChalanasBet(){
 
 /* ============================ COMPONENTES ============================ */
 
-function Splash(){ return (<div className="cb-root"><StyleTag/><div className="cb-splash"><span className="cb-ball">⚽</span><b>CHALANA'S BET</b></div></div>); }
+function Splash(){ return (<div className="cb-root"><StyleTag/><div className="cb-splash"><span className="cb-ball"><img className="cb-ball-img" src="/cabeca-chalanas.png" alt="" onError={(e)=>{ const s=e.currentTarget.parentNode; if(s) s.textContent="⚽"; }}/></span><b>CHALANA'S BET</b></div></div>); }
 
 function Header({me,totals}){
   const myRank = me ? totals.findIndex(t=>t.id===me.id)+1 : 0;
@@ -1328,7 +1328,8 @@ function StyleTag(){
   border:1px solid rgba(255,255,255,.15);}
 .cb-splash{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:14px;
   font-family:'Oswald';font-size:20px;letter-spacing:1px;color:var(--branco);}
-.cb-ball{font-size:40px;animation:spin 1.4s linear infinite;}
+.cb-ball{font-size:40px;animation:spin 1.4s linear infinite;display:inline-flex;}
+.cb-ball-img{width:84px;height:84px;object-fit:contain;display:block;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
 @media(max-width:540px){
