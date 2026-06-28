@@ -1089,7 +1089,7 @@ function StyleTag(){
 /* header */
 .cb-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;}
 .cb-brand{display:flex;align-items:center;gap:12px;}
-.cb-shield{position:relative;width:42px;height:42px;display:grid;place-items:center;border-radius:11px;overflow:hidden;
+.cb-shield{position:relative;width:60px;height:60px;display:grid;place-items:center;border-radius:15px;overflow:hidden;
   background:linear-gradient(150deg,var(--amarelo),var(--amarelo2));color:var(--azul2);
   box-shadow:0 6px 18px rgba(0,0,0,.35),inset 0 0 0 2px rgba(255,255,255,.4);}
 .cb-logo-img{width:100%;height:100%;object-fit:cover;display:block;}
