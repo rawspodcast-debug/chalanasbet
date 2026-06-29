@@ -164,7 +164,7 @@ export default async function handler(req, res) {
       const ph = toPt(am.homeTeam);
       const pa = toPt(am.awayTeam);
       if (!ph || !pa) continue;
-      const ft = am.score && am.score.fullTime;
+      const ft = am.score && am.score.regularTime;
       if (!ft || ft.home == null || ft.away == null) continue;
 
       const m = matches.find(
