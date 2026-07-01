@@ -72,3 +72,26 @@ export async function sDelete(key, shared = true) {
   if (!supabase) { delete mem[key]; return; }
   try { await supabase.from("kv").delete().eq("key", key); } catch (e) { console.error("sDelete", key, e); }
 }
+
+/* ---------- HORA DO SERVIDOR (anti-trapaça de relógio) ----------
+   Lê o header HTTP `Date` de uma resposta do Supabase. É a hora de um servidor
+   real, que o usuário NÃO controla mexendo no relógio do próprio celular.
+   Retorna epoch ms do servidor, ou null se não der (aí o app cai no relógio local). */
+export async function serverNow() {
+  if (!url) return null;
+  try {
+    // HEAD leve no endpoint REST; não precisa de tabela nem retorna linhas.
+    const res = await fetch(`${url}/rest/v1/`, {
+      method: "HEAD",
+      headers: anon ? { apikey: anon } : {},
+      cache: "no-store",
+    });
+    const d = res.headers.get("date");
+    if (!d) return null;
+    const ms = Date.parse(d);
+    return Number.isFinite(ms) ? ms : null;
+  } catch (e) {
+    console.warn("serverNow", e);
+    return null;
+  }
+}
