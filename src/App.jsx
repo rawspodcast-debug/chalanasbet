@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Trophy, Lock, Shield, Users, RefreshCw, Settings, Plus, Check, ChevronDown, Calendar, Flame, X, Sliders } from "lucide-react";
-import { sGet, sSet, sList, serverNow } from "./supabase";
+import { sGet, sSet, sList } from "./supabase";
 
 /* =========================================================================
    CHALANA'S BET — Bolão Copa do Mundo 2026
@@ -194,20 +194,6 @@ const REMOVED_PLAYERS = new Set(["brunodopivo","matheus","vitor coelho"]);
 const ALIAS = { "holanda":"paises baixos","eua":"estados unidos","usa":"estados unidos","czechia":"republica tcheca","south korea":"coreia do sul","fmt":"" };
 const teamKey = (t)=>{ let n=norm(t); return ALIAS[n]||n; };
 const kickoffMs = (m)=> new Date(iso(m.date,m.time)).getTime();
-
-/* ---------- HORA CONFIÁVEL (anti-trapaça de relógio) ----------
-   clockOffset = hora_do_servidor − hora_do_celular. Corrige o caso do usuário que
-   atrasa o relógio do aparelho pra "reabrir" jogos travados. Enquanto o servidor
-   não responde, offset=0 (cai no relógio local) e a guarda de gravação ainda protege. */
-let clockOffset = 0;
-let clockSynced = false;
-const setClockOffset = (serverMs)=>{ if(Number.isFinite(serverMs)){ clockOffset = serverMs - Date.now(); clockSynced = true; } };
-const trustedNow = ()=> Date.now() + clockOffset;
-
-// FONTE ÚNICA DA VERDADE DA TRAVA. Fecha `lockMin` min antes do kickoff (default 10).
-// Usada tanto pela UI quanto pela gravação do palpite — não pode divergir.
-const lockMsOf = (m)=> kickoffMs(m) - (m.lockMin ?? 10)*60*1000;
-const isMatchLocked = (m, nowMs=trustedNow())=> nowMs >= lockMsOf(m);
 const fmtPts = (n)=>{ const v=Math.round(n*10)/10; return (v%1===0? String(v): v.toFixed(1)).replace(".",","); };
 const WD = ["dom","seg","ter","qua","qui","sex","sáb"];
 function dateLabel(d){ const dt=new Date(d+"T12:00:00-03:00"); return `${WD[dt.getDay()]} · ${String(dt.getDate()).padStart(2,"0")}/${String(dt.getMonth()+1).padStart(2,"0")}`; }
@@ -342,20 +328,14 @@ export default function ChalanasBet(){
   },[]);
 
   useEffect(()=>{ (async()=>{
-    // sincroniza a hora com o servidor ANTES de liberar a tela (fecha a trapaça de relógio)
-    setClockOffset(await serverNow());
     await ensureSeed();
     await refresh();
     const me = await sGet(K_ME,false);
     if(me) setMeId(me);
-    setNow(trustedNow());
     setLoaded(true);
   })(); },[refresh,ensureSeed]);
 
-  // tick da UI usa a hora confiável (relógio local + offset do servidor)
-  useEffect(()=>{ const t=setInterval(()=>setNow(trustedNow()),5000); return ()=>clearInterval(t); },[]);
-  // re-sincroniza o offset periodicamente: pega quem atrasa o relógio no meio da sessão
-  useEffect(()=>{ const t=setInterval(async()=>{ setClockOffset(await serverNow()); },60000); return ()=>clearInterval(t); },[]);
+  useEffect(()=>{ const t=setInterval(()=>setNow(Date.now()),20000); return ()=>clearInterval(t); },[]);
   useEffect(()=>{ const t=setInterval(()=>{ refresh(); },25000); return ()=>clearInterval(t); },[refresh]);
 
   const me = useMemo(()=> players.find(p=>p.id===meId) || null, [players,meId]);
@@ -376,28 +356,13 @@ export default function ChalanasBet(){
   /* ----- salvar palpite ----- */
   const saveBet = useCallback(async (matchId, h, a)=>{
     if(!meId) return;
-    // GUARDA DURA: revalida a trava no instante da gravação, contra o horário real do jogo.
-    // A trava visual (inputs disabled) é só cosmética; a verdade mora aqui. Sem isso, um clique
-    // no momento da virada, latência de rede ou UI desatualizada deixaria o palpite passar.
-    const m = matches.find(x=>x.id===matchId);
-    if(!m){ showToast("Jogo não encontrado."); return; }
-    if(!teamsSet(m)){ showToast("Confronto ainda não definido."); return; }
-    if(m.finished){ showToast("Jogo encerrado — palpite fechado."); return; }
-    // Re-sincroniza a hora do servidor NO CLIQUE: fecha a janela de quem atrasa o
-    // relógio do celular segundos antes de salvar. Se o servidor responder, usa a
-    // hora dele; se não (offline), exige que a sessão já tenha sincronizado ao menos 1x.
-    const srv = await serverNow();
-    if(srv!=null) setClockOffset(srv);
-    const nowMs = srv!=null ? srv : trustedNow();
-    if(srv==null && !clockSynced){ showToast("Sem conexão pra validar o horário. Tente de novo."); return; }
-    if(isMatchLocked(m, nowMs)){ showToast("Palpites deste jogo já fecharam."); return; }
     const mine = await getJSON(K_BET(meId),true,{}) || {};
     if(h===""||a===""||h==null||a==null){ delete mine[matchId]; }
     else { mine[matchId] = { h:Math.max(0,Math.min(19,parseInt(h,10)||0)), a:Math.max(0,Math.min(19,parseInt(a,10)||0)) }; }
     await setJSON(K_BET(meId), mine, true);
     setBets(prev=>({ ...prev, [meId]: mine }));
     showToast("Palpite salvo");
-  },[meId,matches,showToast]);
+  },[meId,showToast]);
 
   /* ----- admin: salvar matches / settings ----- */
   const saveBetFor = useCallback(async (pid, matchId, h, a)=>{
@@ -460,7 +425,7 @@ export default function ChalanasBet(){
             )}
           </>
         )}
-        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT) · <span style={{opacity:.65}}>build v12</span></footer>
+        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT) · <span style={{opacity:.65}}>build v11</span></footer>
       </div>
       {toast && <div className="cb-toast">{toast}</div>}
     </div>
@@ -604,8 +569,9 @@ function JogosTab({matches,players,bets,me,now,settings,onSaveBet}){
 
 function MatchCard({m,players,bets,me,now,settings,onSaveBet}){
   const [open,setOpen] = useState(false);
+  const kMs = kickoffMs(m);
   const lockMin = m.lockMin ?? 10;
-  const lockMs = lockMsOf(m);              // mesma fonte da verdade usada na gravação
+  const lockMs = kMs - lockMin*60*1000;
   const locked = now >= lockMs;
   const defined = teamsSet(m);              // confronto definido?
   const mine = bets[me.id]?.[m.id];
@@ -1000,26 +966,32 @@ function AdminTab({matches,settings,players,bets,onSaveMatches,onSaveBetFor,onSa
       const data = await res.json();
       if(data.error){ setIaStatus("Erro: "+data.error); return; }
       const arr = Array.isArray(data.matches) ? data.matches : [];
-      let applied=0;
+      let matched=0, changed=0;
       const next = draft.map(m=>{
         if(!teamsSet(m)) return m;
         const hit = arr.find(r=> (teamKey(r.home)===teamKey(m.home) && teamKey(r.away)===teamKey(m.away))
                               || (teamKey(r.home)===teamKey(m.away) && teamKey(r.away)===teamKey(m.home)));
         if(!hit) return m;
+        matched++;
         const swap = teamKey(hit.home)===teamKey(m.away);
-        const nm = {...m}; let touched=false;
-        if(typeof hit.date==="string" && /^\d{4}-\d{2}-\d{2}$/.test(hit.date)){ nm.date=hit.date; touched=true; }
-        if(typeof hit.time==="string" && /^\d{1,2}:\d{2}$/.test(hit.time)){ nm.time=hit.time.padStart(5,"0"); touched=true; }
+        const nm = {...m};
+        if(typeof hit.date==="string" && /^\d{4}-\d{2}-\d{2}$/.test(hit.date)) nm.date=hit.date;
+        if(typeof hit.time==="string" && /^\d{1,2}:\d{2}$/.test(hit.time)) nm.time=hit.time.padStart(5,"0");
         if(hit.homeScore!=null && hit.awayScore!=null){
-          nm.realH = swap?hit.awayScore:hit.homeScore;
-          nm.realA = swap?hit.homeScore:hit.awayScore;
-          nm.finished = true; touched=true;
+          const nh = swap?hit.awayScore:hit.homeScore;
+          const na = swap?hit.homeScore:hit.awayScore;
+          if(nm.realH!==nh || nm.realA!==na || !nm.finished) changed++;
+          nm.realH=nh; nm.realA=na; nm.finished=true;
         }
-        if(touched) applied++;
         return nm;
       });
       setDraft(next); onSaveMatches(next);
-      setIaStatus(applied>0 ? `✓ ${applied} jogo(s) atualizado(s) (data/hora/placar). Confira e salve.` : "Nenhum jogo da tabela foi atualizado. Ajuste manualmente abaixo.");
+      const fonte = (data.checked!=null)?data.checked:arr.length;
+      setIaStatus(
+        changed>0
+          ? `✓ ${changed} placar(es) novo(s). Fonte: ${fonte} encerrado(s), ${matched} casaram com a tabela.`
+          : `Nada novo. Fonte: ${fonte} jogo(s) encerrado(s), ${matched} casaram — todos já lançados. Se um jogo que já acabou não casou: ou ainda não está "encerrado" na fonte, ou os times dele não estão definidos/salvos na tabela.`
+      );
     }catch(e){
       setIaStatus("Não consegui buscar agora. Ajuste datas, horários e placares manualmente abaixo.");
     }
