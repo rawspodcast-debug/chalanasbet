@@ -194,6 +194,10 @@ const REMOVED_PLAYERS = new Set(["brunodopivo","matheus","vitor coelho"]);
 const ALIAS = { "holanda":"paises baixos","eua":"estados unidos","usa":"estados unidos","czechia":"republica tcheca","south korea":"coreia do sul","fmt":"" };
 const teamKey = (t)=>{ let n=norm(t); return ALIAS[n]||n; };
 const kickoffMs = (m)=> new Date(iso(m.date,m.time)).getTime();
+// FONTE ÚNICA DA VERDADE DA TRAVA. Fecha `lockMin` min antes do kickoff (default 10).
+// Usada tanto pela UI quanto pela gravação do palpite — não pode divergir.
+const lockMsOf = (m)=> kickoffMs(m) - (m.lockMin ?? 10)*60*1000;
+const isMatchLocked = (m, nowMs=Date.now())=> nowMs >= lockMsOf(m);
 const fmtPts = (n)=>{ const v=Math.round(n*10)/10; return (v%1===0? String(v): v.toFixed(1)).replace(".",","); };
 const WD = ["dom","seg","ter","qua","qui","sex","sáb"];
 function dateLabel(d){ const dt=new Date(d+"T12:00:00-03:00"); return `${WD[dt.getDay()]} · ${String(dt.getDate()).padStart(2,"0")}/${String(dt.getMonth()+1).padStart(2,"0")}`; }
@@ -335,7 +339,7 @@ export default function ChalanasBet(){
     setLoaded(true);
   })(); },[refresh,ensureSeed]);
 
-  useEffect(()=>{ const t=setInterval(()=>setNow(Date.now()),20000); return ()=>clearInterval(t); },[]);
+  useEffect(()=>{ const t=setInterval(()=>setNow(Date.now()),5000); return ()=>clearInterval(t); },[]);
   useEffect(()=>{ const t=setInterval(()=>{ refresh(); },25000); return ()=>clearInterval(t); },[refresh]);
 
   const me = useMemo(()=> players.find(p=>p.id===meId) || null, [players,meId]);
@@ -356,13 +360,21 @@ export default function ChalanasBet(){
   /* ----- salvar palpite ----- */
   const saveBet = useCallback(async (matchId, h, a)=>{
     if(!meId) return;
+    // GUARDA DURA: revalida a trava no instante da gravação, contra o horário real do jogo.
+    // A trava visual (inputs disabled) é só cosmética; a verdade mora aqui. Sem isso, um clique
+    // no momento da virada, latência de rede ou UI desatualizada deixaria o palpite passar.
+    const m = matches.find(x=>x.id===matchId);
+    if(!m){ showToast("Jogo não encontrado."); return; }
+    if(!teamsSet(m)){ showToast("Confronto ainda não definido."); return; }
+    if(m.finished){ showToast("Jogo encerrado — palpite fechado."); return; }
+    if(isMatchLocked(m)){ showToast("Palpites deste jogo já fecharam."); return; }
     const mine = await getJSON(K_BET(meId),true,{}) || {};
     if(h===""||a===""||h==null||a==null){ delete mine[matchId]; }
     else { mine[matchId] = { h:Math.max(0,Math.min(19,parseInt(h,10)||0)), a:Math.max(0,Math.min(19,parseInt(a,10)||0)) }; }
     await setJSON(K_BET(meId), mine, true);
     setBets(prev=>({ ...prev, [meId]: mine }));
     showToast("Palpite salvo");
-  },[meId,showToast]);
+  },[meId,matches,showToast]);
 
   /* ----- admin: salvar matches / settings ----- */
   const saveBetFor = useCallback(async (pid, matchId, h, a)=>{
@@ -425,7 +437,7 @@ export default function ChalanasBet(){
             )}
           </>
         )}
-        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT) · <span style={{opacity:.65}}>build v10</span></footer>
+        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT) · <span style={{opacity:.65}}>build v11</span></footer>
       </div>
       {toast && <div className="cb-toast">{toast}</div>}
     </div>
@@ -569,9 +581,8 @@ function JogosTab({matches,players,bets,me,now,settings,onSaveBet}){
 
 function MatchCard({m,players,bets,me,now,settings,onSaveBet}){
   const [open,setOpen] = useState(false);
-  const kMs = kickoffMs(m);
   const lockMin = m.lockMin ?? 10;
-  const lockMs = kMs - lockMin*60*1000;
+  const lockMs = lockMsOf(m);              // mesma fonte da verdade usada na gravação
   const locked = now >= lockMs;
   const defined = teamsSet(m);              // confronto definido?
   const mine = bets[me.id]?.[m.id];
@@ -1089,7 +1100,7 @@ function StyleTag(){
 /* header */
 .cb-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;}
 .cb-brand{display:flex;align-items:center;gap:12px;}
-.cb-shield{position:relative;width:60px;height:60px;display:grid;place-items:center;border-radius:15px;overflow:hidden;
+.cb-shield{position:relative;width:42px;height:42px;display:grid;place-items:center;border-radius:11px;overflow:hidden;
   background:linear-gradient(150deg,var(--amarelo),var(--amarelo2));color:var(--azul2);
   box-shadow:0 6px 18px rgba(0,0,0,.35),inset 0 0 0 2px rgba(255,255,255,.4);}
 .cb-logo-img{width:100%;height:100%;object-fit:cover;display:block;}
@@ -1329,7 +1340,7 @@ function StyleTag(){
 .cb-splash{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:14px;
   font-family:'Oswald';font-size:20px;letter-spacing:1px;color:var(--branco);}
 .cb-ball{font-size:40px;animation:spin 1.4s linear infinite;display:inline-flex;}
-.cb-ball-img{width:150px;height:150px;object-fit:contain;display:block;}
+.cb-ball-img{width:84px;height:84px;object-fit:contain;display:block;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
 @media(max-width:540px){
