@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Trophy, Lock, Shield, Users, RefreshCw, Settings, Plus, Check, ChevronDown, Calendar, Flame, X, Sliders } from "lucide-react";
-import { sGet, sSet, sList } from "./supabase";
+import { sGet, sSet, sList, serverNow } from "./supabase";
 
 /* =========================================================================
    CHALANA'S BET — Bolão Copa do Mundo 2026
@@ -194,10 +194,20 @@ const REMOVED_PLAYERS = new Set(["brunodopivo","matheus","vitor coelho"]);
 const ALIAS = { "holanda":"paises baixos","eua":"estados unidos","usa":"estados unidos","czechia":"republica tcheca","south korea":"coreia do sul","fmt":"" };
 const teamKey = (t)=>{ let n=norm(t); return ALIAS[n]||n; };
 const kickoffMs = (m)=> new Date(iso(m.date,m.time)).getTime();
+
+/* ---------- HORA CONFIÁVEL (anti-trapaça de relógio) ----------
+   clockOffset = hora_do_servidor − hora_do_celular. Corrige o caso do usuário que
+   atrasa o relógio do aparelho pra "reabrir" jogos travados. Enquanto o servidor
+   não responde, offset=0 (cai no relógio local) e a guarda de gravação ainda protege. */
+let clockOffset = 0;
+let clockSynced = false;
+const setClockOffset = (serverMs)=>{ if(Number.isFinite(serverMs)){ clockOffset = serverMs - Date.now(); clockSynced = true; } };
+const trustedNow = ()=> Date.now() + clockOffset;
+
 // FONTE ÚNICA DA VERDADE DA TRAVA. Fecha `lockMin` min antes do kickoff (default 10).
 // Usada tanto pela UI quanto pela gravação do palpite — não pode divergir.
 const lockMsOf = (m)=> kickoffMs(m) - (m.lockMin ?? 10)*60*1000;
-const isMatchLocked = (m, nowMs=Date.now())=> nowMs >= lockMsOf(m);
+const isMatchLocked = (m, nowMs=trustedNow())=> nowMs >= lockMsOf(m);
 const fmtPts = (n)=>{ const v=Math.round(n*10)/10; return (v%1===0? String(v): v.toFixed(1)).replace(".",","); };
 const WD = ["dom","seg","ter","qua","qui","sex","sáb"];
 function dateLabel(d){ const dt=new Date(d+"T12:00:00-03:00"); return `${WD[dt.getDay()]} · ${String(dt.getDate()).padStart(2,"0")}/${String(dt.getMonth()+1).padStart(2,"0")}`; }
@@ -332,14 +342,20 @@ export default function ChalanasBet(){
   },[]);
 
   useEffect(()=>{ (async()=>{
+    // sincroniza a hora com o servidor ANTES de liberar a tela (fecha a trapaça de relógio)
+    setClockOffset(await serverNow());
     await ensureSeed();
     await refresh();
     const me = await sGet(K_ME,false);
     if(me) setMeId(me);
+    setNow(trustedNow());
     setLoaded(true);
   })(); },[refresh,ensureSeed]);
 
-  useEffect(()=>{ const t=setInterval(()=>setNow(Date.now()),5000); return ()=>clearInterval(t); },[]);
+  // tick da UI usa a hora confiável (relógio local + offset do servidor)
+  useEffect(()=>{ const t=setInterval(()=>setNow(trustedNow()),5000); return ()=>clearInterval(t); },[]);
+  // re-sincroniza o offset periodicamente: pega quem atrasa o relógio no meio da sessão
+  useEffect(()=>{ const t=setInterval(async()=>{ setClockOffset(await serverNow()); },60000); return ()=>clearInterval(t); },[]);
   useEffect(()=>{ const t=setInterval(()=>{ refresh(); },25000); return ()=>clearInterval(t); },[refresh]);
 
   const me = useMemo(()=> players.find(p=>p.id===meId) || null, [players,meId]);
@@ -367,7 +383,14 @@ export default function ChalanasBet(){
     if(!m){ showToast("Jogo não encontrado."); return; }
     if(!teamsSet(m)){ showToast("Confronto ainda não definido."); return; }
     if(m.finished){ showToast("Jogo encerrado — palpite fechado."); return; }
-    if(isMatchLocked(m)){ showToast("Palpites deste jogo já fecharam."); return; }
+    // Re-sincroniza a hora do servidor NO CLIQUE: fecha a janela de quem atrasa o
+    // relógio do celular segundos antes de salvar. Se o servidor responder, usa a
+    // hora dele; se não (offline), exige que a sessão já tenha sincronizado ao menos 1x.
+    const srv = await serverNow();
+    if(srv!=null) setClockOffset(srv);
+    const nowMs = srv!=null ? srv : trustedNow();
+    if(srv==null && !clockSynced){ showToast("Sem conexão pra validar o horário. Tente de novo."); return; }
+    if(isMatchLocked(m, nowMs)){ showToast("Palpites deste jogo já fecharam."); return; }
     const mine = await getJSON(K_BET(meId),true,{}) || {};
     if(h===""||a===""||h==null||a==null){ delete mine[matchId]; }
     else { mine[matchId] = { h:Math.max(0,Math.min(19,parseInt(h,10)||0)), a:Math.max(0,Math.min(19,parseInt(a,10)||0)) }; }
@@ -437,7 +460,7 @@ export default function ChalanasBet(){
             )}
           </>
         )}
-        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT) · <span style={{opacity:.65}}>build v11</span></footer>
+        <footer className="cb-foot">Chalana's Bet · Bolão Copa 2026 — horários em Brasília (BRT) · <span style={{opacity:.65}}>build v12</span></footer>
       </div>
       {toast && <div className="cb-toast">{toast}</div>}
     </div>
